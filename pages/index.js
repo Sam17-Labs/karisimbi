@@ -13,7 +13,7 @@ export default function Home() {
 
       <main className={styles.main}>
         <h1 className={styles.title}>
-          Kariasimbi Portal
+          Karisimbi Portal
         </h1>
 
         <div className={styles.grid}>
