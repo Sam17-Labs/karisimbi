@@ -16,7 +16,6 @@
     "axios": "^0.27.2",
     "dotenv": "^16.0.2",
     "file-type": "^18.0.0",
-    "fs": "0.0.1-security",
     "graphql": "^16.6.0",
     "graphql-ws": "^5.10.1",
     "next": "12.2.5",
