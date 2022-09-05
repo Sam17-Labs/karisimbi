@@ -1,5 +1,5 @@
 import Head from 'next/head'
-import Image from 'next/image'
+import Link from 'next/link'
 import styles from '../styles/Home.module.css'
 
 export default function Home() {
@@ -17,15 +17,19 @@ export default function Home() {
         </h1>
 
         <div className={styles.grid}>
-          <a href="/account" className={styles.card}>
-            <h2>Profile &rarr;</h2>
-            <p>Generate or view security keys.</p>
-          </a>
-
-          <a href="/upload" className={styles.card}>
-            <h2>Upload file &rarr;</h2>
-            <p>Upload and encrypt files on s3.</p>
-          </a>
+          <Link href="/account">
+            <a className={styles.card}>
+              <h2>Profile &rarr;</h2>
+              <p>Generate or view security keys.</p>
+            </a>
+          </Link>
+          
+          <Link  href="/upload">
+            <a className={styles.card}>
+              <h2>Upload file &rarr;</h2>
+              <p>Upload and encrypt files on s3.</p>
+            </a>
+          </Link>
         </div>
       </main>
 
