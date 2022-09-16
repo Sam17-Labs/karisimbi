@@ -2,24 +2,54 @@ import { useRouter } from 'next/router'
 import { useState } from 'react';
 import { curve } from '@futuretense/curve25519-elliptic';
 import { useEffect } from 'react';
+import { gql, useMutation } from '@apollo/client';
 
 export default function Account() {
   const [keys, setKeys] = useState();
   let privateKey;
   let publicKey;
+
+  const createUserMutation = gql`
+    mutation createUserProfile($user: User_insert_input = { publicKey: ""}) {
+      createOneUser(object: $user) {
+        id
+        publicKey
+      }
+    }  
+  `
+
+  const [createOneUser, {data, loading, error}] = useMutation(createUserMutation);
+
+  useEffect(() => {
+    console.log(error);
+  }, [error]);
+
   const generateKeys = () => {
     privateKey = curve.randomScalar();
     publicKey = curve.basepoint.mul(privateKey).toBuffer();
 
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("privateKey", Buffer.from(privateKey.toBuffer()));
+      window.localStorage.setItem("privateKey", Buffer.from(privateKey.toBuffer()).toString("base64"));
+      console.log(Buffer.from(privateKey.toBuffer()).toString("base64"));
     }
     setKeys({publicKey, privateKey});
+
+    // create keys 
+    createOneUser({
+      variables: {
+        user: {
+          publicKey: Buffer.from(publicKey).toString("base64")
+        }
+      }
+    })
   }
 
+  console.log(publicKey);
+
   useEffect(() => {
+    console.log(window.localStorage.getItem("privateKey"));
     if(window?.localStorage.getItem("privateKey") && !keys){
-      privateKey = curve.scalarFromBuffer(window.localStorage.getItem("privateKey"));
+      privateKey = curve.scalarFromBuffer(Buffer.from(window.localStorage.getItem("privateKey"), "base64"));
       publicKey = curve.basepoint.mul(privateKey).toBuffer();
       setKeys({publicKey, privateKey});
     }

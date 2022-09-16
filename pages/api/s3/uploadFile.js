@@ -1,4 +1,3 @@
-import { NextApiRequest, NextApiResponse } from "next";
 import S3 from "aws-sdk/clients/s3";
 
 const s3 = new S3({
@@ -7,10 +6,7 @@ const s3 = new S3({
   signatureVersion: "v4",
 });
 
-console.log(s3);
-
 export default async (req, res) => {
-  console.log(req);
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }

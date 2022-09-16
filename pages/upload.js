@@ -3,22 +3,53 @@ import { useRouter } from 'next/router'
 import axios from "axios";
 import { curve } from '@futuretense/curve25519-elliptic';
 import { PRE } from "@futuretense/proxy-reencryption";
-//import {fileTypeFromBuffer} from 'file-type';
+import download from "downloadjs";
+import { gql, useMutation, useQuery } from "@apollo/client";
+
 
 const BUCKET_URL = "https://karisimbi-s3-files.s3.amazonaws.com/";
 
 export default function Upload() {
   const [file, setFile] = useState();
   const [uploadingStatus, setUploadingStatus] = useState();
-  const [uploadedFile, setUploadedFile] = useState();
   const [keys, setKeys] = useState();
+  const [user, setUser] = useState();
   const router = useRouter();
 
   const selectFile = async(e) => {
-    console.log(await e.target.files[0].arrayBuffer());
-
     setFile(e.target.files[0]);
   };
+
+  const createFileMutation = gql`
+    mutation createFileMutation($fileObject: File_insert_input = {}) {
+      createOneFile(object: $fileObject) {
+        id
+        fileName
+        fileMimeType
+        owner
+        s3Url
+      }
+    }
+  `
+  const [createOneFile, { data, loading, error }] = useMutation(createFileMutation);
+
+  const getUserByPublicKeyQuery = gql`
+    query getUserByPublicKey($publicKey: String = "") {
+      users(where: {publicKey: {_eq: $publicKey}}) {
+        id
+        publicKey
+        username
+      }
+    }  
+  `
+
+  const { data: usersQueryData, 
+    loading: usersQueryLoading, 
+    error:UsersQueryError } = useQuery(getUserByPublicKeyQuery, {
+      variables: {
+        publicKey: (keys) ? Buffer.from(keys?.publicKey).toString("base64") : ""
+      }
+    });
 
   const uploadFile = async () => {
     // Encrypting the file
@@ -26,7 +57,7 @@ export default function Upload() {
     const tag = Buffer.from('TAG');
     const fileBuffer = await file.arrayBuffer();
     const cipherFile = await pre.selfEncrypt(fileBuffer, tag);
-    
+
     setUploadingStatus("Uploading the file to AWS S3");
 
     let { data } = await axios.post("/api/s3/uploadFile", {
@@ -41,21 +72,42 @@ export default function Upload() {
       },
     });
 
-    const plainFile = await pre.selfDecrypt(cipherFile);
-    //console.log(await fileTypeFromBuffer(plainFile));
+    // const plainFile = await pre.selfDecrypt(cipherFile);
+    // const blob = new Blob([plainFile], { type: file.type });
+    // const blobUrl = URL.createObjectURL(blob);
+    // const a = document.createElement("a");
+    // a.download = file.name || Math.random();
+    // a.href = blobUrl;
+    // a.click();
+    // URL.revokeObjectURL(blob);
+    createOneFile({
+      variables: {
+        fileObject: {
+          fileMimeType: file.type, 
+          fileName: file.name,
+          owner: user.id, 
+          s3Url: BUCKET_URL + file.name
+        }
+      }
+    })
     setUploadingStatus("Finished uploading!");
-    setUploadedFile(BUCKET_URL + file.name);
     setFile(null);
   };
 
   useEffect(() => {
+    if(usersQueryData){
+      setUser(usersQueryData.users[0]);
+    }
+  }, [usersQueryData]);
+
+  useEffect(() => {
     if(window != undefined){
-      const privateKeyBuffer = window.localStorage.getItem("privateKey");
-      if(privateKeyBuffer && !keys){
-        const privateKey = curve.scalarFromBuffer(privateKeyBuffer);
+      const privateKeyBase64= window.localStorage.getItem("privateKey");
+      if(privateKeyBase64 && !keys){
+        const privateKey = curve.scalarFromBuffer(Buffer.from(privateKeyBase64, "base64"));
         const publicKey = curve.basepoint.mul(privateKey).toBuffer();
         setKeys({publicKey, privateKey});
-      } else if (!privateKeyBuffer){
+      } else if (!privateKeyBase64){
         router.push('/account');
       }
     }
@@ -78,7 +130,6 @@ export default function Upload() {
           </>
         )}
         {uploadingStatus && <p>{uploadingStatus}</p>}
-        {uploadedFile && <img src={uploadedFile} />}
       </main>
     </div>
   );

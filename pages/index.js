@@ -1,8 +1,103 @@
-import Head from 'next/head'
-import Link from 'next/link'
-import styles from '../styles/Home.module.css'
+import Head from 'next/head';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import styles from '../styles/Home.module.css';
+import axios from "axios";
+import { gql, useQuery } from "@apollo/client";
+import { curve } from '@futuretense/curve25519-elliptic';
+import { PRE } from "@futuretense/proxy-reencryption";
 
 export default function Home() {
+  const [keys, setKeys] = useState();
+  const [user, setUser] = useState();
+  const [files, setFiles] = useState([]);
+
+  const getUserByPublicKeyQuery = gql`
+    query getUserByPublicKey($publicKey: String = "") {
+      users(where: {publicKey: {_eq: $publicKey}}) {
+        id
+        publicKey
+        username
+      }
+    }  
+  `
+  
+
+  const { data: usersQueryData, 
+    loading: usersQueryLoading, 
+    error:UsersQueryError } = useQuery(getUserByPublicKeyQuery, {
+      variables: {
+        publicKey: (keys) ? Buffer.from(keys?.publicKey).toString("base64") : ""
+      }
+    });
+
+  const getFilesById = gql`
+    query getfilesById($owner: uuid = "") {
+      files(where: {owner: {_eq: $owner}}) {
+        createdAt
+        fileMimeType
+        description
+        fileName
+        id
+        owner
+        s3Url
+        updatedAt
+      }
+    }`
+  
+  const { data: filesQueryData, 
+    loading: filesQueryLoading, 
+    error: filesQueryError } = useQuery(getFilesById, {
+      variables: {
+        owner: user?.id
+      }
+    });
+    
+  useEffect(() => {
+    if(window != undefined){
+      const privateKeyBase64= window.localStorage.getItem("privateKey");
+      if(privateKeyBase64 && !keys){
+        const privateKey = curve.scalarFromBuffer(Buffer.from(privateKeyBase64, "base64"));
+        const publicKey = curve.basepoint.mul(privateKey).toBuffer();
+        setKeys({publicKey, privateKey});
+      } else if (!privateKeyBase64){
+        router.push('/account');
+      }
+    }
+  });
+
+  useEffect(() => {
+    if(usersQueryData){
+      setUser(usersQueryData.users[0]);
+    }
+  }, [usersQueryData]);
+
+  useEffect(() => {
+    if(filesQueryData){
+      setFiles(filesQueryData.files);
+    }
+    console.log(filesQueryError);
+  }, [filesQueryData, filesQueryError]);
+
+  console.log(files);
+
+  const download = async(file) => {
+    const cipherFileData = await axios({
+      method: "GET",
+      url: file.s3Url
+    });
+    const cipherFile =  Buffer.from(cipherFileData.data);
+    const pre = new PRE(keys.privateKey.toBuffer(), curve);
+    const tag = Buffer.from('TAG');
+    const plainFile = await pre.selfDecrypt(cipherFile);
+    const blob = new Blob([plainFile], { type: file.type });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.download = file.name || Math.random();
+    a.href = blobUrl;
+    a.click();
+    URL.revokeObjectURL(blob);
+  }
   return (
     <div className={styles.container}>
       <Head>
@@ -31,6 +126,35 @@ export default function Home() {
             </a>
           </Link>
         </div>
+        <table class="table-fixed">
+          <thead>
+            <tr>
+              <th>Id</th>
+              <th>Owner</th>
+              <th>File name</th>
+              <th>File type</th>
+              <th>Description</th>
+              <th>S3 URL</th>
+              <th>Created at</th>
+              <th>Updated at</th>
+            </tr>
+          </thead>
+          <tbody>
+            {files.map(
+              (file) =>
+                <tr>
+                <td>{file.id}</td>
+                <td>{file.owner}</td>
+                <td onClick={() => download(file)}>{file.fileName}</td>
+                <td>{file.fileMimeType}</td>
+                <td>{file.description}</td>
+                <td>{file.s3Url}</td>
+                <td>{file.createdAt}</td>
+                <td>{file.updatedAt}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </main>
 
       <footer className={styles.footer}>
