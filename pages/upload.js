@@ -65,21 +65,22 @@ export default function Upload() {
     });
 
     const url = data.url;
-    await axios.put(url, cipherFile.data, {
+    await axios.put(url, cipherFile, {
       headers: {
-        "Content-type": file.type,
+        "Content-type": "text/javascript",
         "Access-Control-Allow-Origin": "*",
       },
     });
 
-    // const plainFile = await pre.selfDecrypt(cipherFile);
-    // const blob = new Blob([plainFile], { type: file.type });
-    // const blobUrl = URL.createObjectURL(blob);
-    // const a = document.createElement("a");
-    // a.download = file.name || Math.random();
-    // a.href = blobUrl;
-    // a.click();
-    // URL.revokeObjectURL(blob);
+    console.log(cipherFile);
+    const plainFile = await pre.selfDecrypt(cipherFile);
+    const blob = new Blob([plainFile], { type: file.type });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.download = file.name || Math.random();
+    a.href = blobUrl;
+    a.click();
+    URL.revokeObjectURL(blob);
     createOneFile({
       variables: {
         fileObject: {

@@ -22,7 +22,6 @@ export default function Home() {
     }  
   `
   
-
   const { data: usersQueryData, 
     loading: usersQueryLoading, 
     error:UsersQueryError } = useQuery(getUserByPublicKeyQuery, {
@@ -76,28 +75,39 @@ export default function Home() {
     if(filesQueryData){
       setFiles(filesQueryData.files);
     }
-    console.log(filesQueryError);
   }, [filesQueryData, filesQueryError]);
 
-  console.log(files);
+  function toBuffer(ab) {
+    const buf = Buffer.alloc(ab.length);
+    const view = new Uint8Array(ab);
+    for (let i = 0; i < buf.length; ++i) {
+        buf[i] = view[i];
+    }
+    return buf;
+  }
 
   const download = async(file) => {
-    const cipherFileData = await axios({
+    const { data:cipherFile } = await axios({
       method: "GET",
       url: file.s3Url
     });
-    const cipherFile =  Buffer.from(cipherFileData.data);
+    console.log(Buffer.isBuffer(cipherFile.overallChecksum.data));
+    for (const attribute of Object.keys(cipherFile)) {
+      const attributeDataArr = Buffer.from(cipherFile[attribute].data);
+      data[attribute]= attributeDataArr;      
+    }
     const pre = new PRE(keys.privateKey.toBuffer(), curve);
-    const tag = Buffer.from('TAG');
     const plainFile = await pre.selfDecrypt(cipherFile);
-    const blob = new Blob([plainFile], { type: file.type });
+    const type = file.fileMimeType.split("/")[0];
+    const blob = new Blob([plainFile], { type});
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.download = file.name || Math.random();
+    a.download = file.fileName || Math.random();
     a.href = blobUrl;
     a.click();
     URL.revokeObjectURL(blob);
   }
+
   return (
     <div className={styles.container}>
       <Head>
