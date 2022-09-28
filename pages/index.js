@@ -6,12 +6,22 @@ import axios from "axios";
 import { gql, useQuery } from "@apollo/client";
 import { curve } from '@futuretense/curve25519-elliptic';
 import { PRE } from "@futuretense/proxy-reencryption";
+import { useRouter } from 'next/router';
+
+let pre;
 
 export default function Home() {
   const [keys, setKeys] = useState();
   const [user, setUser] = useState();
   const [files, setFiles] = useState([]);
-
+  const router = useRouter();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState();
+  const [shareAddress, setShareAddress] = useState();
+  if (keys) {
+    pre = new PRE(keys.privateKey.toBuffer(), curve);
+  }
+   
   const getUserByPublicKeyQuery = gql`
     query getUserByPublicKey($publicKey: String = "") {
       users(where: {publicKey: {_eq: $publicKey}}) {
@@ -77,26 +87,21 @@ export default function Home() {
     }
   }, [filesQueryData, filesQueryError]);
 
-  function toBuffer(ab) {
-    const buf = Buffer.alloc(ab.length);
-    const view = new Uint8Array(ab);
-    for (let i = 0; i < buf.length; ++i) {
-        buf[i] = view[i];
-    }
-    return buf;
-  }
-
   const download = async(file) => {
-    const { data:cipherFile } = await axios({
+    const { data: cipherFile } = await axios({
       method: "GET",
       url: file.s3Url
     });
-    console.log(Buffer.isBuffer(cipherFile.overallChecksum.data));
+
+    console.log(cipherFile);
+
+    pre = new PRE(keys.privateKey.toBuffer(), curve);
+
     for (const attribute of Object.keys(cipherFile)) {
       const attributeDataArr = Buffer.from(cipherFile[attribute].data);
-      data[attribute]= attributeDataArr;      
+      cipherFile[attribute]= attributeDataArr;      
     }
-    const pre = new PRE(keys.privateKey.toBuffer(), curve);
+
     const plainFile = await pre.selfDecrypt(cipherFile);
     const type = file.fileMimeType.split("/")[0];
     const blob = new Blob([plainFile], { type});
@@ -107,6 +112,33 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(blob);
   }
+  const openShareModal = (file) => {
+    setIsShareModalOpen(true);
+    setSelectedFile(file);
+    console.log(file);
+  }
+
+  const closeShareModel = () => {
+    setIsShareModalOpen(false);
+    setSelectedFile({});
+    setShareAddress();
+  }
+
+  const shareFile = async() => {
+    if(shareAddress){
+      const tag = Buffer.from('TAG');
+      const shareAddressBuffer = Buffer.from(shareAddress, "base64");
+      const reEncryptionKey = pre.generateReKey(shareAddressBuffer, tag);
+
+      let { data } = await axios.post("/api/share", {
+        file: file.id,
+        reEncryptionKey: reEncryptionKey,
+        shareAddress: shareAddressBuffer
+      });
+    }
+  }
+
+  console.log(isShareModalOpen);
 
   return (
     <div className={styles.container}>
@@ -152,7 +184,7 @@ export default function Home() {
           <tbody>
             {files.map(
               (file) =>
-                <tr>
+                <tr key={file.id}>
                 <td>{file.id}</td>
                 <td>{file.owner}</td>
                 <td onClick={() => download(file)}>{file.fileName}</td>
@@ -161,10 +193,63 @@ export default function Home() {
                 <td>{file.s3Url}</td>
                 <td>{file.createdAt}</td>
                 <td>{file.updatedAt}</td>
+                <td>
+                  <button class="bg-pink-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded \
+                  shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" 
+                  type="button" onClick={() => openShareModal(file)}>
+                    Share
+                  </button>
+                </td>
               </tr>
             )}
           </tbody>
         </table>
+        {(isShareModalOpen) ? (
+          <>
+            <div class=" overflow-x-hidden overflow-y-auto fixed inset-0 z-50 outline-none focus:outline-none justify-center items-center" id="modal-id">
+              <div class="relative w-auto my-6 mx-auto max-w-3xl">
+                <div class="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+                  <div class="flex items-start justify-between p-5 border-b border-solid border-slate-200 rounded-t">
+                    <h3 class="text-3xl font-semibold  text-black">
+                      Share file
+                    </h3>
+                    <button class="p-1 ml-auto bg-transparent border text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none" onClick={() => closeShareModel()}>
+                      <span class="bg-transparent text-black h-6 w-6 text-2xl block outline-none focus:outline-none">
+                        ×
+                      </span>
+                    </button>
+                  </div>
+                  <div class="relative p-6 flex-auto">
+                    <p class="my-4 text-black leading-relaxed">
+                      {"File: " + selectedFile.fileName}
+                    </p>
+                    <label for="address" class="text-black">Address: </label>
+                    <input type="text" id="address" name="address" class="border border-black bg-white text-black" onChange={(e) => setShareAddress(e.target.value)}></input>
+                  </div>
+                  <div class="flex items-center justify-end p-6 border-t border-solid border-slate-200 rounded-b">
+                    <button class="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none \
+                     focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={() => closeShareModel()}>
+                      Close
+                    </button>
+                    <button class="bg-emerald-500 text-white active:bg-emerald-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={shareFile}>
+                      Share
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <div class="hidden opacity-25 fixed inset-0 z-40 bg-black" id="modal-id-backdrop"></div>
+        </>
+        ):(<> </>)}
+        
+{/* <script type="text/javascript">
+  function toggleModal(modalID){
+    document.getElementById(modalID).classList.toggle("hidden");
+    document.getElementById(modalID + "-backdrop").classList.toggle("hidden");
+    document.getElementById(modalID).classList.toggle("flex");
+    document.getElementById(modalID + "-backdrop").classList.toggle("flex");
+  }
+</script> */}
       </main>
 
       <footer className={styles.footer}>

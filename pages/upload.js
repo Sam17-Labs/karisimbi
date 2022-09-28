@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRouter } from 'next/router'
+import { useRouter } from 'next/router';
 import axios from "axios";
 import { curve } from '@futuretense/curve25519-elliptic';
 import { PRE } from "@futuretense/proxy-reencryption";
