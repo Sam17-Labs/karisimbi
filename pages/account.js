@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useRouter } from 'next/router'
 import { useState } from 'react';
 import { curve } from '@futuretense/curve25519-elliptic';

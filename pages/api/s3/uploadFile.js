@@ -6,6 +6,7 @@ const s3 = new S3({
   signatureVersion: "v4",
 });
 
+// eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });

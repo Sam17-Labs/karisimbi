@@ -73,7 +73,7 @@ export default function Home() {
         router.push('/account');
       }
     }
-  });
+  }, [keys, router]);
 
   useEffect(() => {
     if(usersQueryData){
@@ -112,6 +112,7 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(blob);
   }
+  
   const openShareModal = (file) => {
     setIsShareModalOpen(true);
     setSelectedFile(file);
@@ -129,12 +130,14 @@ export default function Home() {
       const tag = Buffer.from('TAG');
       const shareAddressBuffer = Buffer.from(shareAddress, "base64");
       const reEncryptionKey = pre.generateReKey(shareAddressBuffer, tag);
-
+      console.log("selectedFile:", selectedFile);
       let { data } = await axios.post("/api/share", {
-        file: file.id,
+        file: selectedFile,
         reEncryptionKey: reEncryptionKey,
         shareAddress: shareAddressBuffer
       });
+
+      // console.log(data);
     }
   }
 
@@ -168,7 +171,7 @@ export default function Home() {
             </a>
           </Link>
         </div>
-        <table class="table-fixed">
+        <table className="table-fixed">
           <thead>
             <tr>
               <th>Id</th>
@@ -194,7 +197,7 @@ export default function Home() {
                 <td>{file.createdAt}</td>
                 <td>{file.updatedAt}</td>
                 <td>
-                  <button class="bg-pink-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded \
+                  <button className="bg-pink-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded \
                   shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" 
                   type="button" onClick={() => openShareModal(file)}>
                     Share
@@ -206,39 +209,39 @@ export default function Home() {
         </table>
         {(isShareModalOpen) ? (
           <>
-            <div class=" overflow-x-hidden overflow-y-auto fixed inset-0 z-50 outline-none focus:outline-none justify-center items-center" id="modal-id">
-              <div class="relative w-auto my-6 mx-auto max-w-3xl">
-                <div class="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
-                  <div class="flex items-start justify-between p-5 border-b border-solid border-slate-200 rounded-t">
-                    <h3 class="text-3xl font-semibold  text-black">
+            <div className=" overflow-x-hidden overflow-y-auto fixed inset-0 z-50 outline-none focus:outline-none justify-center items-center" id="modal-id">
+              <div className="relative w-auto my-6 mx-auto max-w-3xl">
+                <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+                  <div className="flex items-start justify-between p-5 border-b border-solid border-slate-200 rounded-t">
+                    <h3 className="text-3xl font-semibold  text-black">
                       Share file
                     </h3>
-                    <button class="p-1 ml-auto bg-transparent border text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none" onClick={() => closeShareModel()}>
-                      <span class="bg-transparent text-black h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    <button className="p-1 ml-auto bg-transparent border text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none" onClick={() => closeShareModel()}>
+                      <span className="bg-transparent text-black h-6 w-6 text-2xl block outline-none focus:outline-none">
                         ×
                       </span>
                     </button>
                   </div>
-                  <div class="relative p-6 flex-auto">
-                    <p class="my-4 text-black leading-relaxed">
+                  <div className="relative p-6 flex-auto">
+                    <p className="my-4 text-black leading-relaxed">
                       {"File: " + selectedFile.fileName}
                     </p>
-                    <label for="address" class="text-black">Address: </label>
-                    <input type="text" id="address" name="address" class="border border-black bg-white text-black" onChange={(e) => setShareAddress(e.target.value)}></input>
+                    <label htmlFor="address" className="text-black">Address: </label>
+                    <input type="text" id="address" name="address" className="border border-black bg-white text-black" onChange={(e) => setShareAddress(e.target.value)}></input>
                   </div>
-                  <div class="flex items-center justify-end p-6 border-t border-solid border-slate-200 rounded-b">
-                    <button class="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none \
+                  <div className="flex items-center justify-end p-6 border-t border-solid border-slate-200 rounded-b">
+                    <button className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none \
                      focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={() => closeShareModel()}>
                       Close
                     </button>
-                    <button class="bg-emerald-500 text-white active:bg-emerald-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={shareFile}>
+                    <button className="bg-emerald-500 text-white active:bg-emerald-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={shareFile}>
                       Share
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-          <div class="hidden opacity-25 fixed inset-0 z-40 bg-black" id="modal-id-backdrop"></div>
+          <div className="hidden opacity-25 fixed inset-0 z-40 bg-black" id="modal-id-backdrop"></div>
         </>
         ):(<> </>)}
         
