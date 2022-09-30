@@ -6,7 +6,7 @@ import { PRE } from "@futuretense/proxy-reencryption";
 import { curve } from '@futuretense/curve25519-elliptic';
 
 import S3 from "aws-sdk/clients/s3";
-import { randomBytes, randomUUID } from "crypto";
+import { randomUUID } from "crypto";
 
 const s3 = new S3({
   accessKeyId: process.env.S3_ACCESS_KEY,
@@ -14,11 +14,13 @@ const s3 = new S3({
   signatureVersion: "v4",
 });
 
+const BUCKET_URL = "https://karisimbi-s3-files.s3.amazonaws.com/";
+
 export default async (req, res) => {
     if (req.method !== "POST") {
       return res.status(405).json({ message: "Method not allowed" });
     }
-    let { file, reEncryptionKey, shareAddress } = req.body;
+    let { file, reEncryptionKey, shareAddress, userId } = req.body;
     console.log(file, reEncryptionKey, shareAddress);
     // Get the file from S3 
     const { data: cipherFile } = await axios({
@@ -42,10 +44,12 @@ export default async (req, res) => {
 
     console.log(reEncryptedFile);
 
+    const fileIdentifier = randomUUID()
+
     // Store the new file in S3
     const fileParams = {
       Bucket: process.env.BUCKET_NAME,
-      Key: randomUUID(),
+      Key: fileIdentifier,
       Expires: 600
     };
 
@@ -72,12 +76,15 @@ export default async (req, res) => {
       }
     }
     `
-  // console.log("client:", graphqlClient);
-  // const data = await graphqlClient.request(createFileMutation, {
-  //   fileName: file.fileName,
-  //   fileMimeType: file.fileMimeType,
-  //   owner: 
-  // })
-  // console.log(JSON.stringify(data, undefined, 2))
+  const data = await graphqlClient.request(createFileMutation, {
+    fileObject:{
+      fileName: file.fileName,
+      fileMimeType: file.fileMimeType,
+      owner: userId, 
+      s3Url: BUCKET_URL + fileIdentifier,
+      shared: true
+    }
+  });
+
   res.status(200).json(JSON.stringify(data));
   };

@@ -50,6 +50,7 @@ export default function Home() {
         id
         owner
         s3Url
+        shared
         updatedAt
       }
     }`
@@ -93,16 +94,19 @@ export default function Home() {
       url: file.s3Url
     });
 
-    console.log(cipherFile);
-
     pre = new PRE(keys.privateKey.toBuffer(), curve);
 
     for (const attribute of Object.keys(cipherFile)) {
       const attributeDataArr = Buffer.from(cipherFile[attribute].data);
       cipherFile[attribute]= attributeDataArr;      
     }
-
-    const plainFile = await pre.selfDecrypt(cipherFile);
+    
+    let plainFile;
+    if (file.shared) {
+      plainFile = await pre.reDecrypt(cipherFile);
+    } else {
+      plainFile = await pre.selfDecrypt(cipherFile);
+    }
     const type = file.fileMimeType.split("/")[0];
     const blob = new Blob([plainFile], { type});
     const blobUrl = URL.createObjectURL(blob);
@@ -112,7 +116,7 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(blob);
   }
-  
+
   const openShareModal = (file) => {
     setIsShareModalOpen(true);
     setSelectedFile(file);
@@ -134,10 +138,12 @@ export default function Home() {
       let { data } = await axios.post("/api/share", {
         file: selectedFile,
         reEncryptionKey: reEncryptionKey,
-        shareAddress: shareAddressBuffer
+        shareAddress: shareAddressBuffer,
+        userId: user.id
       });
 
-      // console.log(data);
+      console.log(data);
+      closeShareModel();
     }
   }
 
@@ -196,13 +202,15 @@ export default function Home() {
                 <td>{file.s3Url}</td>
                 <td>{file.createdAt}</td>
                 <td>{file.updatedAt}</td>
-                <td>
-                  <button className="bg-pink-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded \
-                  shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" 
-                  type="button" onClick={() => openShareModal(file)}>
-                    Share
-                  </button>
-                </td>
+                {(!file.shared) ? (
+                  <td>
+                    <button className="bg-pink-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded \
+                    shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" 
+                    type="button" onClick={() => openShareModal(file)}>
+                      Share
+                    </button>
+                  </td>
+                ):(<></>)}
               </tr>
             )}
           </tbody>
@@ -244,15 +252,6 @@ export default function Home() {
           <div className="hidden opacity-25 fixed inset-0 z-40 bg-black" id="modal-id-backdrop"></div>
         </>
         ):(<> </>)}
-        
-{/* <script type="text/javascript">
-  function toggleModal(modalID){
-    document.getElementById(modalID).classList.toggle("hidden");
-    document.getElementById(modalID + "-backdrop").classList.toggle("hidden");
-    document.getElementById(modalID).classList.toggle("flex");
-    document.getElementById(modalID + "-backdrop").classList.toggle("flex");
-  }
-</script> */}
       </main>
 
       <footer className={styles.footer}>
