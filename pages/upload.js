@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import axios from "axios";
 import { curve } from '@futuretense/curve25519-elliptic';
 import { PRE } from "@futuretense/proxy-reencryption";
-import download from "downloadjs";
 import { gql, useMutation, useQuery } from "@apollo/client";
 
 
@@ -60,11 +59,10 @@ export default function Upload() {
 
     setUploadingStatus("Uploading the file to AWS S3");
 
-    let { data } = await axios.post("/api/s3/uploadFile", {
+    const { data: { url } } = await axios.post("/api/s3/uploadFile", {
       name: file.name,
     });
 
-    const url = data.url;
     await axios.put(url, cipherFile, {
       headers: {
         "Content-type": "text/javascript",
@@ -102,6 +100,7 @@ export default function Upload() {
   }, [usersQueryData]);
 
   useEffect(() => {
+    // Fetch the file
     if(window != undefined){
       const privateKeyBase64= window.localStorage.getItem("privateKey");
       if(privateKeyBase64 && !keys){
