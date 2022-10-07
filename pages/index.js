@@ -11,18 +11,21 @@ let pre;
 const BUCKET_URL = "https://karisimbi-s3-files.s3.amazonaws.com/";
 
 export default function Home() {
+  const router = useRouter();
+
   const [keys, setKeys] = useState();
   const [user, setUser] = useState();
   const [files, setFiles] = useState([]);
   const [filteredFiles, setFilteredFiles] = useState();
   const [uploadedFile, setUploadedFile] = useState();
-  const router = useRouter();
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState();
   const [shareAddress, setShareAddress] = useState();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadingStatus, setUploadingStatus] = useState();
   const [searchKeyword, setSearchKeyword] = useState();
+  const [isAccountDetailModalOpen, setIsAccountDetailModelOpen] = useState(false);
+
   if (keys) {
     pre = new PRE(keys.privateKey.toBuffer(), curve);
   }
@@ -49,7 +52,6 @@ export default function Home() {
       }
     }  
   `
-  
   const { data: usersQueryData, 
     loading: usersQueryLoading, 
     error:UsersQueryError } = useQuery(getUserByPublicKeyQuery, {
@@ -57,7 +59,7 @@ export default function Home() {
         publicKey: (keys) ? Buffer.from(keys?.publicKey).toString("base64") : ""
       }
     });
-
+  
   const getFilesById = gql`
     query getfilesById($owner: uuid = "") {
       files(where: {owner: {_eq: $owner}}) {
@@ -80,6 +82,18 @@ export default function Home() {
         owner: user?.id
       }
     });
+
+  const createUserMutation = gql`
+    mutation createUserProfile($user: User_insert_input = { publicKey: ""}) {
+      createOneUser(object: $user) {
+        id
+        publicKey
+        username
+      }
+    }  
+  `
+
+  const [createOneUser, { data: createUserData }] = useMutation(createUserMutation);
     
   useEffect(() => {
     if(window != undefined){
@@ -88,8 +102,6 @@ export default function Home() {
         const privateKey = curve.scalarFromBuffer(Buffer.from(privateKeyBase64, "base64"));
         const publicKey = curve.basepoint.mul(privateKey).toBuffer();
         setKeys({publicKey, privateKey});
-      } else if (!privateKeyBase64){
-        router.push('/account');
       }
     }
   }, [keys, router]);
@@ -99,6 +111,12 @@ export default function Home() {
       setUser(usersQueryData.users[0]);
     }
   }, [usersQueryData]);
+
+  useEffect(() => {
+    if(createUserData) {
+      setUser(createUserData.createOneUser);
+    }
+  }, [createUserData])
 
   useEffect(() => {
     if(filesQueryData){
@@ -176,6 +194,33 @@ export default function Home() {
     }
   }
 
+  const generateKeys = () => {
+    const privateKey = curve.randomScalar();
+    const publicKey = curve.basepoint.mul(privateKey).toBuffer();
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("privateKey", Buffer.from(privateKey.toBuffer()).toString("base64"));
+      console.log(Buffer.from(privateKey.toBuffer()).toString("base64"));
+    }
+    setKeys({publicKey, privateKey});
+
+    // create keys 
+    createOneUser({
+      variables: {
+        user: {
+          publicKey: Buffer.from(publicKey).toString("base64")
+        }
+      }
+    })
+  };
+
+  const openAccountDetailModal = (file) => {
+    setIsAccountDetailModelOpen(true);
+  }
+
+  const closeAccountDetailModal = () => {
+    setIsAccountDetailModelOpen(false);
+  }
   const uploadFile = async () => {
     // Encrypting the file
     const tag = Buffer.from('TAG');
@@ -194,16 +239,7 @@ export default function Home() {
         "Access-Control-Allow-Origin": "*",
       },
     });
-
-    console.log(cipherFile);
-    const plainFile = await pre.selfDecrypt(cipherFile);
-    const blob = new Blob([plainFile], { type: uploadedFile.type });
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.download = uploadFile.name || Math.random();
-    a.href = blobUrl;
-    a.click();
-    URL.revokeObjectURL(blob);
+    
     createOneFile({
       variables: {
         fileObject: {
@@ -219,10 +255,8 @@ export default function Home() {
   };
 
   const filterFiles = () => {
-    console.log({files})
-    console.log(files.filter((file) => file.fileName.includes(searchKeyword)));
     setFilteredFiles(files.filter((file) => file.fileName.includes(searchKeyword)));
-  }
+  };
 
   return (
     <div>
@@ -239,9 +273,8 @@ export default function Home() {
                     <span className="self-center text-xl font-semibold whitespace-nowrap">Karisimbi Portal</span>
                 </a>
                 <div className="flex items-center lg:order-2">
-                    {(keys)?(<p className="bg-gray-500 text-white active:bg-gray-600 font-bold uppercase text-sm px-6 py-3 rounded shadow \
-                      hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">{"PK: " + keys?.publicKey.toString("base64").slice(0,5) + "..."}</p>):(<a href="#" className="bg-gray-500 text-white active:bg-gray-600 font-bold uppercase text-sm px-6 py-3 rounded shadow \
-                      hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">Sign up</a>)}
+                    <button onClick={() => openAccountDetailModal()} className="bg-gray-500 text-white active:bg-gray-600 font-bold uppercase text-sm px-6 py-3 rounded shadow \
+                      hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">{(keys) ? "PK: " + keys?.publicKey.toString("base64").slice(0,5) + "..." : "Sign up"}</button>
                     <button onClick={() => openUploadModal()} className="text-white bg-gray-800 font-bold rounded-lg text-sm px-5 py-bg-gray-500 text-white active:bg-gray-600 font-bold \
                       uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">Upload new file</button>
                     <button data-collapse-toggle="mobile-menu-2" type="button" className="inline-flex items-center p-2 ml-1 \
@@ -300,7 +333,7 @@ export default function Home() {
                   <td className="border border-gray-300 p-2">
                     <button className="bg-gray-100 hover:bg-gray-300 text-gray-darkest rounded font-bold py-2 px-4 inline-flex items-center" onClick={() => download(file)}>
                       <svg className="w-4 h-4 mr-2 hover:text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z"/></svg>
-                      <span>Download</span>
+                      <span>Decrypt</span>
                     </button>
                   </td>
                   {(!file.shared) ? (
@@ -381,6 +414,45 @@ export default function Home() {
                     <button className="bg-gray-500 text-white active:bg-gray-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={uploadFile}>
                       Upload
                     </button>)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          <div className="hidden opacity-25 fixed inset-0 z-40 bg-black" id="modal-id-backdrop"></div>
+        </div>
+        ):(<> </>)}
+        {(isAccountDetailModalOpen) ? (
+          <div className="flex flex-col self-center p-4 min-h-screen justify-center">
+            <div className="overflow-x-hidden overflow-y-auto fixed inset-0 z-50 outline-none focus:outline-none justify-center items-center" id="modal-id">
+              <div className="relative w-auto my-6 mx-auto max-w-3xl flex flex-col self-center p-4 min-h-screen justify-center">
+                <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none bg-gray-100">
+                  <div className="flex items-start justify-between p-5 border-b border-solid border-slate-200 rounded-t">
+                    <h3 className="text-2xl font-semibold text-black">
+                      {(keys)? "Security keys" : "Generate security keys"}
+                    </h3>
+                    <button className="p-1 ml-auto bg-transparent border text-black float-right text-3xl leading-none font-semibold outline-none focus:outline-none" onClick={() => closeAccountDetailModal()}>
+                      <span className="bg-transparent text-black h-6 w-6 text-2xl block outline-none focus:outline-none">
+                        ×
+                      </span>
+                    </button>
+                  </div>
+                  <div className="relative p-6 flex-auto self-center">
+                  {keys?(
+                  <>
+                    <p>Public key: {Buffer.from(keys?.publicKey).toString("base64")}</p>
+                    <p>Private key: {Buffer.from(keys?.privateKey.toBuffer()).toString("base64")}</p>
+                    <p className="italic font-bold">Note: the private key should be kept private</p>
+                  </>):(<>
+                    <button className="bg-gray-500 text-white active:bg-gray-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={generateKeys}>
+                      Create security keys
+                    </button>                
+                  </>)}
+                  </div>
+                  <div className="flex items-center justify-end p-6 border-t border-solid border-slate-200 rounded-b">
+                    <button className="text-gray-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none \
+                     focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={() => closeAccountDetailModal()}>
+                      Close
+                    </button>
                   </div>
                 </div>
               </div>
